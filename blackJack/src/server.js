@@ -46,13 +46,13 @@ io.on('connection', (socket) => {
             const player2Ready = readyPlayers[game.player2.id];
 
             if (player1Ready && player2Ready) {
-                io.to(game.player1.id).emit('bothReady', games[gameId]);
-                io.to(game.player2.id).emit('bothReady', games[gameId]);
+                io.to(game.player1.id).emit('bothReady', { hands: games[gameId].hands });
+                io.to(game.player2.id).emit('bothReady', { hands: games[gameId].hands });
                 delete readyPlayers[game.player1.id];
                 delete readyPlayers[game.player2.id];
             } else {
                 socket.emit('waiting', '相手が準備完了するのを待っています');
-                const opponentId = game.player1.id === socket.id ? game.player2.id : game.player1.id;
+                //const opponentId = game.player1.id === socket.id ? game.player2.id : game.player1.id;
                 //io.to(opponentId).emit('waiting', '相手が準備完了するのを待っています');
             }
         }

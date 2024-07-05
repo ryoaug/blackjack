@@ -64,7 +64,7 @@
     </div>
 
     <div id="waiting" style="display: none;">
-        <p id="waitingMessage">相手の準備が完了するのを待っています...</p>
+        <p id="waitingMessage"></p>
     </div>
 
     <div id="game" style="display:none;">
@@ -76,17 +76,16 @@
             <p>チップ: <span id="chips">5</span></p>
             <button id="bet">ベット</button>
             <button id="fold">フォールド</button>
+            <div id="chat">
+                <div id="chatMessages"></div>
+                <input id="chatInput" type="text" placeholder="メッセージを入力">
+                <button id="chatSend">送信</button>
+            </div>
+            <button id="endGame">ゲーム終了</button>
         </div>
-        <div id="chat">
-            <div id="chatMessages"></div>
-            <input id="chatInput" type="text" placeholder="メッセージを入力">
-            <button id="chatSend">送信</button>
-        </div>
-        <button id="endGame">ゲーム終了</button>
     </div>
-    </div>
-
-    <script src="/socket.io/socket.io.js"></script>
+    <script src="/socket.io/socket.io.js">
+    </script>
     <script src="client.js"></script>
 </body>
 

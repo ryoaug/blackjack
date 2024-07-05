@@ -127,7 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             socket.emit('readyToStart', hands); // ゲーム開始準備完了をサーバーに通知
             socket.on('waiting', (message) => {
-                // 待機画面の表示
+                document.getElementById('waitingMessage').textContent = message;
                 setupContainer.style.display = 'none';
                 waitingContainer.style.display = 'block';
             });
@@ -153,6 +153,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     socket.on('bothReady', (gameState) => {
         console.log('両プレイヤーが準備完了:', gameState);
+        const hands = gameState.hands[socket.id];
+        if (hands) {
+            Object.keys(hands).forEach((hand, index) => {
+                const container = handContainers[`hand${index + 1}Container`];
+                hands[hand].forEach(cardValue => {
+                    const card = document.createElement('div');
+                    card.classList.add('card');
+                    card.textContent = cardValue;
+                    container.appendChild(card);
+                });
+                updateHandSum(`hand${index + 1}`);
+            });
+        }
         waitingContainer.style.display = 'none';
         setupContainer.style.display = 'none';
         gameContainer.style.display = 'block';
@@ -199,12 +212,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function displayYourHands() {
         yourHandsContainer.innerHTML = '';
-        Object.values(handContainers).forEach((container, index) => {
-            const handClone = container.cloneNode(true);
-            handClone.id = `yourHand${index}`;
-            yourHandsContainer.appendChild(handClone);
+        Object.keys(handContainers).forEach(hand => {
+            const handWrapper = document.createElement('div');
+            handWrapper.classList.add('handWrapper');
+    
+            const handButton = document.createElement('button');
+            handButton.textContent = `${hand}を開く`;
+            handButton.id = hand;
+            handButton.type = 'button';
+            handWrapper.appendChild(handButton);
+    
+            const handContainer = document.createElement('div');
+            handContainer.classList.add('handContainer');
+            handContainers[hand].querySelectorAll('.card').forEach(card => {
+                const cardCopy = card.cloneNode(true);
+                handContainer.appendChild(cardCopy);
+            });
+            handWrapper.appendChild(handContainer);
+    
+            const handSum = document.createElement('p');
+            handSum.textContent = `合計: ${handSums[hand].textContent}`;
+            handWrapper.appendChild(handSum);
+    
+            yourHandsContainer.appendChild(handWrapper);
+    
+            // ハンドボタンにクリックイベントを追加
+            handButton.addEventListener('click', () => {
+                const cardsInHand = Array.from(handContainer.querySelectorAll('.card'));
+                const cardInfo = cardsInHand.map(card => card.textContent);
+                console.log(`${hand} のカード情報:`, cardInfo);
+            });
         });
     }
+    
+    
+
+    
 
     betButton.addEventListener('click', () => {
         if (chips > 0) {
