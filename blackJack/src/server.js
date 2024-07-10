@@ -9,6 +9,7 @@ const io = socketIo(server);
 let waitingPlayer = null;
 let games = {};
 let readyPlayers = {};
+let players = {};  // プレイヤーの情報を管理
 
 app.use(express.static('public'));
 
@@ -57,6 +58,44 @@ io.on('connection', (socket) => {
             }
         }
     });
+
+    socket.on('handSelected', (data) => {
+        const playerId = socket.id;
+        players[playerId] = data.hand;
+
+        // 両方のプレイヤーがハンドを選択したか確認
+        if (Object.keys(players).length === 2) {
+            const opponentId = Object.keys(players).find(id => id !== playerId);
+            const opponentHand = players[opponentId];
+
+            // 両プレイヤーに対戦結果を送信
+            io.to(playerId).emit('showdown', { yourHand: data.hand, opponentHand });
+            io.to(opponentId).emit('showdown', { yourHand: opponentHand, opponentHand: data.hand });
+
+            // プレイヤーの情報をリセット
+            players = {};
+        }
+    });
+
+    // クライアントからのハンド選択を受け取る
+    socket.on('handSelected', (data) => {
+        const playerId = socket.id;
+        players[playerId] = data.hand;
+
+        // 両方のプレイヤーがハンドを選択したか確認
+        if (Object.keys(players).length === 2) {
+            const opponentId = Object.keys(players).find(id => id !== playerId);
+            const opponentHand = players[opponentId];
+
+            // 両プレイヤーに対戦結果を送信
+            io.to(playerId).emit('showdown', { yourHand: data.hand, opponentHand });
+            io.to(opponentId).emit('showdown', { yourHand: opponentHand, opponentHand: data.hand });
+
+            // プレイヤーの情報をリセット
+            players = {};
+        }
+    });
+
 
     socket.on('bet', (handIndex) => {
         const gameId = getGameIdByPlayerId(socket.id);

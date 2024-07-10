@@ -144,6 +144,32 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    socket.on('showdown', (opponentHand) => {
+        console.log('対戦結果:', opponentHand);
+        // 選択されたハンドを新しい画面に表示
+        const yourHandContainer = document.getElementById('yourSelectedHandContainer');
+        yourHandContainer.innerHTML = '';
+        selectedHand.forEach(cardValue => {
+            const card = document.createElement('div');
+            card.classList.add('card');
+            card.textContent = cardValue;
+            yourHandContainer.appendChild(card);
+        });
+        // 相手のハンドを新しい画面に表示
+        const opponentHandContainer = document.getElementById('opponentHandContainer');
+        opponentHandContainer.innerHTML = '';
+        opponentHand.forEach(cardValue => {
+            const card = document.createElement('div');
+            card.classList.add('card');
+            card.textContent = cardValue;
+            opponentHandContainer.appendChild(card);
+        });
+
+        // 新しい画面を表示
+        document.getElementById('showdown').style.display = 'block';
+        document.getElementById('game').style.display = 'none';
+    });
+
     socket.on('gameStart', (gameState) => {
         console.log('ゲームが開始されました:', gameState);
         lobbyContainer.style.display = 'none';
@@ -184,20 +210,10 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('ゲームの状態が更新されました:', gameState);
     });
 
-    socket.on('gameEnd', (winner) => {
-        alert(`ゲーム終了! 勝者: ${winner}`);
-        setupContainer.style.display = 'block';
-        gameContainer.style.display = 'none';
-    });
-
     socket.on('opponentDisconnected', () => {
         alert('対戦相手が切断しました。');
         setupContainer.style.display = 'block';
         gameContainer.style.display = 'none';
-    });
-
-    document.getElementById('endGame').addEventListener('click', () => {
-        socket.emit('endGame');
     });
 
     // 勝負開始後のゲーム画面ロジック
@@ -215,13 +231,13 @@ document.addEventListener('DOMContentLoaded', () => {
         Object.keys(handContainers).forEach(hand => {
             const handWrapper = document.createElement('div');
             handWrapper.classList.add('handWrapper');
-    
+
             const handButton = document.createElement('button');
-            handButton.textContent = `${hand}を開く`;
-            handButton.id = hand;
+            handButton.textContent = `${hand}`;
+            //handButton.id = hand;
             handButton.type = 'button';
             handWrapper.appendChild(handButton);
-    
+
             const handContainer = document.createElement('div');
             handContainer.classList.add('handContainer');
             handContainers[hand].querySelectorAll('.card').forEach(card => {
@@ -229,25 +245,93 @@ document.addEventListener('DOMContentLoaded', () => {
                 handContainer.appendChild(cardCopy);
             });
             handWrapper.appendChild(handContainer);
-    
+
             const handSum = document.createElement('p');
             handSum.textContent = `合計: ${handSums[hand].textContent}`;
             handWrapper.appendChild(handSum);
-    
+
             yourHandsContainer.appendChild(handWrapper);
-    
+
             // ハンドボタンにクリックイベントを追加
             handButton.addEventListener('click', () => {
-                const cardsInHand = Array.from(handContainer.querySelectorAll('.card'));
-                const cardInfo = cardsInHand.map(card => card.textContent);
-                console.log(`${hand} のカード情報:`, cardInfo);
+                const selectedHandIndex = hand;  // ハンドの識別子として使用する
+                const selectedHandCards = Array.from(handContainers[hand].querySelectorAll('.card'))
+                    .map(card => card.textContent);
+                console.log(`${hand} のカード情報:`, selectedHandCards);
+                if (confirm(`${hand} で勝負しますか？`)) {
+                    /*const cardsInHand = Array.from(handContainer.querySelectorAll('.card'));
+                    const cardInfo = cardsInHand.map(card => card.textContent);
+                    console.log(`${hand} のカード情報:`, cardInfo);*/
+                    socket.emit('handSelected', selectedHandIndex, selectedHandCards);
+                    console.log('ハンド確定:', selectedHandIndex, selectedHandCards);
+                    // 待機画面を表示する
+                    waitingContainer.style.display = 'block';
+                    gameContainer.style.display = 'none';
+                    setupContainer.style.display = 'none';
+                    // ここでハンドを確定させる処理を追加する場合はここに記述する
+                    // 例: socket.emit('handSelected', selectedHandIndex, cards);
+                    /*document.getElementById('hand').addEventListener('click', () => {
+                        const selectedHandIndex = currentHandIndex;  // 選択したハンドのインデックス
+                        const selectedHand = Object.values(handContainers)[selectedHandIndex].querySelectorAll('.card');
+                        const cards = Array.from(selectedHand).map(card => card.textContent);
+                        socket.emit('handSelected', selectedHandIndex, cards);
+                        console.log('ハンド確定:', selectedHandIndex, cards);
+
+                        // 待機画面を表示する
+                        waitingContainer.style.display = 'block';
+                        setupContainer.style.display = 'none';
+                    });*/
+
+                    /*document.getElementById('hand').addEventListener('click', () => {
+                        const selectedHandIndex = currentHandIndex;  // 選択したハンドのインデックス
+                        const selectedHand = Object.values(handContainers)[selectedHandIndex].querySelectorAll('.card');
+                        const cards = Array.from(selectedHand).map(card => card.textContent);
+                        socket.emit('handSelected', selectedHandIndex, cards);
+                        console.log('ハンド確定:', selectedHandIndex, cards);
+                
+                        // 待機画面を表示する
+                        waitingContainer.style.display = 'block';
+                        setupContainer.style.display = 'none';
+                    });*/
+                }
             });
         });
     }
-    
-    
 
-    
+    socket.on('bothReady', (gameState) => {
+        console.log('両プレイヤーが準備完了:', gameState);
+        waitingContainer.style.display = 'none';
+        gameContainer.style.display = 'block';
+        displayYourHands();
+    });
+
+    socket.on('showdown', (opponentHand) => {
+        console.log('対戦結果:', opponentHand);
+        // 選択されたハンドを新しい画面に表示
+        const yourHandContainer = document.getElementById('yourSelectedHandContainer');
+        yourHandContainer.innerHTML = '';
+        selectedHand.forEach(cardValue => {
+            const card = document.createElement('div');
+            card.classList.add('card');
+            card.textContent = cardValue;
+            yourHandContainer.appendChild(card);
+        });
+        // 相手のハンドを新しい画面に表示
+        const opponentHandContainer = document.getElementById('opponentHandContainer');
+        opponentHandContainer.innerHTML = '';
+        opponentHand.forEach(cardValue => {
+            const card = document.createElement('div');
+            card.classList.add('card');
+            card.textContent = cardValue;
+            opponentHandContainer.appendChild(card);
+        });
+
+        // 新しい画面を表示
+        document.getElementById('showdown').style.display = 'block';
+        document.getElementById('game').style.display = 'none';
+    });
+
+
 
     betButton.addEventListener('click', () => {
         if (chips > 0) {
@@ -290,18 +374,5 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         alert(`ラウンドの結果: ${result.message}`);
         chipsDisplay.textContent = chips;
-    });
-
-    socket.on('bothReady', (gameState) => {
-        console.log('両プレイヤーが準備完了:', gameState);
-        waitingContainer.style.display = 'none';
-        gameContainer.style.display = 'block';
-        displayYourHands();
-    });
-
-    socket.on('gameEnd', (winner) => {
-        alert(`ゲーム終了! 勝者: ${winner}`);
-        setupContainer.style.display = 'block';
-        gameContainer.style.display = 'none';
     });
 });

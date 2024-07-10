@@ -81,9 +81,26 @@
                 <input id="chatInput" type="text" placeholder="メッセージを入力">
                 <button id="chatSend">送信</button>
             </div>
-            <button id="endGame">ゲーム終了</button>
         </div>
     </div>
+
+    <div id="showdown" style="display: none;">
+        <h3>対戦結果</h3>
+        <div id="opponentHand">
+            <h4>相手のハンド</h4>
+            <div id="opponentHandContainer"></div>
+        </div>
+        <div id="yourSelectedHand">
+            <h4>あなたの選択したハンド</h4>
+            <div id="yourSelectedHandContainer"></div>
+        </div>
+        <div id="chat">
+            <div id="chatMessages"></div>
+            <input id="chatInput" type="text" placeholder="メッセージを入力">
+            <button id="chatSend">送信</button>
+        </div>
+    </div>
+
     <script src="/socket.io/socket.io.js">
     </script>
     <script src="client.js"></script>
