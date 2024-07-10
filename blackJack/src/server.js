@@ -58,27 +58,9 @@ io.on('connection', (socket) => {
             }
         }
     });
-
-    socket.on('handSelected', (data) => {
-        const playerId = socket.id;
-        players[playerId] = data.hand;
-
-        // 両方のプレイヤーがハンドを選択したか確認
-        if (Object.keys(players).length === 2) {
-            const opponentId = Object.keys(players).find(id => id !== playerId);
-            const opponentHand = players[opponentId];
-
-            // 両プレイヤーに対戦結果を送信
-            io.to(playerId).emit('showdown', { yourHand: data.hand, opponentHand });
-            io.to(opponentId).emit('showdown', { yourHand: opponentHand, opponentHand: data.hand });
-
-            // プレイヤーの情報をリセット
-            players = {};
-        }
-    });
-
+    
     // クライアントからのハンド選択を受け取る
-    socket.on('handSelected', (data) => {
+    /*socket.on('handSelected', (data) => {
         const playerId = socket.id;
         players[playerId] = data.hand;
 
@@ -94,25 +76,21 @@ io.on('connection', (socket) => {
             // プレイヤーの情報をリセット
             players = {};
         }
-    });
+    });*/
 
-
-    socket.on('bet', (handIndex) => {
-        const gameId = getGameIdByPlayerId(socket.id);
-        if (gameId) {
-            const game = games[gameId];
-            game.currentBet[handIndex] += 1;
-            const opponentId = game.player1.id === socket.id ? game.player2.id : game.player1.id;
-            io.to(opponentId).emit('opponentBet', handIndex);
-        }
-    });
-
-    socket.on('fold', (handIndex) => {
-        const gameId = getGameIdByPlayerId(socket.id);
-        if (gameId) {
-            const game = games[gameId];
-            const opponentId = game.player1.id === socket.id ? game.player2.id : game.player1.id;
-            io.to(opponentId).emit('opponentFold', handIndex);
+    let waitingPlayers = [];
+    socket.on('goBetTime', () => {
+        if (waitingPlayers.length === 0) {
+            waitingPlayers.push(socket.id);
+            console.log(`Added ${socket.id} to waitingPlayers`);
+            socket.emit('wait', '相手の準備完了を待っています');
+        }else if(waitingPlayers.length === 1){
+            waitingPlayers.push(socket.id);
+            console.log(`Added ${socket.id} to waitingPlayers`);
+            /*io.to(waitingPlayers[0]).emit('bettime');
+            io.to(waitingPlayers[1]).emit('bettime');*/
+            socket.emit('bettime');
+            waitingPlayers = [];
         }
     });
 

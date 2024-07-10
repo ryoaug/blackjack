@@ -74,14 +74,21 @@
             <h4>あなたのハンド</h4>
             <div id="yourHandsContainer"></div>
             <p>チップ: <span id="chips">5</span></p>
-            <button id="bet">ベット</button>
-            <button id="fold">フォールド</button>
             <div id="chat">
                 <div id="chatMessages"></div>
                 <input id="chatInput" type="text" placeholder="メッセージを入力">
                 <button id="chatSend">送信</button>
             </div>
         </div>
+    </div>
+
+    <div id="bettime" style="display: none;">
+        <h2>ベットタイム</h2>
+        <button id="callButton">コール</button>
+        <button id="raiseButton">レイズ</button>
+        <button id="foldButton">フォールド</button>
+        <button id="confirmBet">確定</button> 
+        <!-- 現在のベットや他の関連情報をここに表示 -->
     </div>
 
     <div id="showdown" style="display: none;">

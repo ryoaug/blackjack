@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const waitingContainer = document.getElementById('waiting');
     const gameContainer = document.getElementById('game');
     const cardContainer = document.getElementById('cards');
+    const bettimeContainer = document.getElementById('bettime');
     const handContainers = {
         hand1: document.getElementById('hand1Container'),
         hand2: document.getElementById('hand2Container'),
@@ -46,6 +47,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const modal = document.getElementById('checkrulesModal');
         if (event.target == modal) {
             closeModal();
+        }
+    });
+
+    document.getElementById('startgame').addEventListener('click', () => {
+        const name = prompt('名前を入力してください:');
+        if (name) {
+            console.log(`${name}がゲームに参加しました`);
+            socket.emit('joinGame', name);
+            socket.on('waiting', (message) => {
+                console.log('Waiting for another player...');
+                document.getElementById('waitingMessage').textContent = message;
+                lobbyContainer.style.display = 'none';
+                waitingContainer.style.display = 'block';
+            });
         }
     });
 
@@ -103,20 +118,6 @@ document.addEventListener('DOMContentLoaded', () => {
         handSums[hand].textContent = `合計: ${sum}`;
     }
 
-    document.getElementById('startgame').addEventListener('click', () => {
-        const name = prompt('名前を入力してください:');
-        if (name) {
-            console.log(`${name}がゲームに参加しました`);
-            socket.emit('joinGame', name);
-            socket.on('waiting', (message) => {
-                console.log('Waiting for another player...');
-                document.getElementById('waitingMessage').textContent = message;
-                lobbyContainer.style.display = 'none';
-                waitingContainer.style.display = 'block';
-            });
-        }
-    });
-
     document.getElementById('start').addEventListener('click', () => {
         const handsCompleted = Object.values(handContainers).every(container => container.children.length === 3);
         if (handsCompleted) {
@@ -142,32 +143,6 @@ document.addEventListener('DOMContentLoaded', () => {
             socket.emit('sendMessage', message);
             chatInput.value = '';
         }
-    });
-
-    socket.on('showdown', (opponentHand) => {
-        console.log('対戦結果:', opponentHand);
-        // 選択されたハンドを新しい画面に表示
-        const yourHandContainer = document.getElementById('yourSelectedHandContainer');
-        yourHandContainer.innerHTML = '';
-        selectedHand.forEach(cardValue => {
-            const card = document.createElement('div');
-            card.classList.add('card');
-            card.textContent = cardValue;
-            yourHandContainer.appendChild(card);
-        });
-        // 相手のハンドを新しい画面に表示
-        const opponentHandContainer = document.getElementById('opponentHandContainer');
-        opponentHandContainer.innerHTML = '';
-        opponentHand.forEach(cardValue => {
-            const card = document.createElement('div');
-            card.classList.add('card');
-            card.textContent = cardValue;
-            opponentHandContainer.appendChild(card);
-        });
-
-        // 新しい画面を表示
-        document.getElementById('showdown').style.display = 'block';
-        document.getElementById('game').style.display = 'none';
     });
 
     socket.on('gameStart', (gameState) => {
@@ -218,9 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 勝負開始後のゲーム画面ロジック
     const yourHandsContainer = document.getElementById('yourHandsContainer');
-    const chipsDisplay = document.getElementById('chips');
-    const betButton = document.getElementById('bet');
-    const foldButton = document.getElementById('fold');
+    //const chipsDisplay = document.getElementById('chips');
 
     let currentHandIndex = 0;
     let chips = 5;
@@ -259,44 +232,27 @@ document.addEventListener('DOMContentLoaded', () => {
                     .map(card => card.textContent);
                 console.log(`${hand} のカード情報:`, selectedHandCards);
                 if (confirm(`${hand} で勝負しますか？`)) {
-                    /*const cardsInHand = Array.from(handContainer.querySelectorAll('.card'));
-                    const cardInfo = cardsInHand.map(card => card.textContent);
-                    console.log(`${hand} のカード情報:`, cardInfo);*/
-                    socket.emit('handSelected', selectedHandIndex, selectedHandCards);
+                    //socket.emit('handSelected', selectedHandIndex, selectedHandCards);
+                    socket.emit('goBetTime');
+                    console.log('socket.emit(goBetTime);');
                     console.log('ハンド確定:', selectedHandIndex, selectedHandCards);
-                    // 待機画面を表示する
-                    waitingContainer.style.display = 'block';
-                    gameContainer.style.display = 'none';
-                    setupContainer.style.display = 'none';
-                    // ここでハンドを確定させる処理を追加する場合はここに記述する
-                    // 例: socket.emit('handSelected', selectedHandIndex, cards);
-                    /*document.getElementById('hand').addEventListener('click', () => {
-                        const selectedHandIndex = currentHandIndex;  // 選択したハンドのインデックス
-                        const selectedHand = Object.values(handContainers)[selectedHandIndex].querySelectorAll('.card');
-                        const cards = Array.from(selectedHand).map(card => card.textContent);
-                        socket.emit('handSelected', selectedHandIndex, cards);
-                        console.log('ハンド確定:', selectedHandIndex, cards);
-
-                        // 待機画面を表示する
+                    socket.on('wait', (message) => {     // 待機画面を表示する
+                        console.log('wait for another player...');
+                        document.getElementById('waitingMessage').textContent = message;
                         waitingContainer.style.display = 'block';
+                        gameContainer.style.display = 'none';
                         setupContainer.style.display = 'none';
-                    });*/
-
-                    /*document.getElementById('hand').addEventListener('click', () => {
-                        const selectedHandIndex = currentHandIndex;  // 選択したハンドのインデックス
-                        const selectedHand = Object.values(handContainers)[selectedHandIndex].querySelectorAll('.card');
-                        const cards = Array.from(selectedHand).map(card => card.textContent);
-                        socket.emit('handSelected', selectedHandIndex, cards);
-                        console.log('ハンド確定:', selectedHandIndex, cards);
-                
-                        // 待機画面を表示する
-                        waitingContainer.style.display = 'block';
-                        setupContainer.style.display = 'none';
-                    });*/
+                    });
                 }
             });
         });
     }
+
+    socket.on('bettime', () => {
+        console.log('ベットタイム画面になりました');
+        waitingContainer.style.display = 'none';
+        bettimeContainer.style.display = 'block';
+    });
 
     socket.on('bothReady', (gameState) => {
         console.log('両プレイヤーが準備完了:', gameState);
@@ -305,7 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
         displayYourHands();
     });
 
-    socket.on('showdown', (opponentHand) => {
+    /*socket.on('showdown', (opponentHand) => {
         console.log('対戦結果:', opponentHand);
         // 選択されたハンドを新しい画面に表示
         const yourHandContainer = document.getElementById('yourSelectedHandContainer');
@@ -329,24 +285,25 @@ document.addEventListener('DOMContentLoaded', () => {
         // 新しい画面を表示
         document.getElementById('showdown').style.display = 'block';
         document.getElementById('game').style.display = 'none';
+    });*/
+
+    // ベットタイム画面のボタンにイベントリスナーを追加する
+    document.getElementById('callButton').addEventListener('click', () => {
+        socket.emit('bet', { action: 'call' });
     });
 
-
-
-    betButton.addEventListener('click', () => {
-        if (chips > 0) {
-            chips -= 1;
-            chipsDisplay.textContent = chips;
-            socket.emit('bet', currentHandIndex);
-            checkRoundCompletion();
-        } else {
-            alert('これ以上ベットできません');
-        }
+    document.getElementById('raiseButton').addEventListener('click', () => {
+        socket.emit('bet', { action: 'raise' });
     });
 
-    foldButton.addEventListener('click', () => {
-        socket.emit('fold', currentHandIndex);
-        checkRoundCompletion();
+    document.getElementById('foldButton').addEventListener('click', () => {
+        socket.emit('bet', { action: 'fold' });
+    });
+
+    // ベットタイム終了後、ショーダウン画面に遷移する処理を追加する
+    socket.on('endBetTime', () => {
+        bettimeContainer.style.display = 'none';
+        gameContainer.style.display = 'block'; // ショーダウン画面の表示など
     });
 
     function checkRoundCompletion() {
