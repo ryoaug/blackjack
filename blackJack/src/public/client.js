@@ -1,3 +1,5 @@
+//https://github.com/CampKK/netpro2024/tree/master/full-count-blackjack
+
 const socket = io();
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -6,7 +8,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const waitingContainer = document.getElementById('waiting');
     const gameContainer = document.getElementById('game');
     const cardContainer = document.getElementById('cards');
-    const bettimeContainer = document.getElementById('bettime');
+    const foldContainer = document.getElementById('fold');
+    const showdownContainer = document.getElementById('showdown');
+    const gametimeContainer = document.getElementById('gametime');
+    const yourSelectedHandContainer = document.getElementById('yourSelectedHandContainer');
+    const opponentHandContainer = document.getElementById('opponentHandContainer');
+    const chipsContainer = document.getElementById('chips');
+    const yourSelectedHandSumContainer = document.getElementById('yourSelectedHandSum');
     const handContainers = {
         hand1: document.getElementById('hand1Container'),
         hand2: document.getElementById('hand2Container'),
@@ -25,43 +33,37 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatInput = document.getElementById('chatInput');
     const chatSend = document.getElementById('chatSend');
     const chatMessages = document.getElementById('chatMessages');
+    const gameMessages = document.getElementById('gameMessages'); // ゲーム情報の表示エリア
+    const foldButton = document.getElementById('foldButton');
+    const callButton = document.getElementById('callButton');
+    const raiseButton = document.getElementById('raiseButton');
 
-    function openModal() {
-        const modal = document.getElementById('checkrulesModal');
-        //console.log('Opening modal:', modal); // デバッグログ
-        modal.style.display = 'block';
-    }
-    // モーダルを閉じるための関数
-    function closeModal() {
-        const modal = document.getElementById('checkrulesModal');
-        modal.style.display = 'none';
-    }
-    // ボタンにクリックイベントを追加
-    const openModalBtn = document.getElementById('checkrules');
-    openModalBtn.addEventListener('click', openModal);
-    // 閉じるボタンにクリックイベントを追加
-    const closeModalBtn = document.getElementsByClassName('close')[0];
-    closeModalBtn.addEventListener('click', closeModal);
-    // モーダル外の背景をクリックしても閉じる
-    window.addEventListener('click', function (event) {
-        const modal = document.getElementById('checkrulesModal');
-        if (event.target == modal) {
-            closeModal();
-        }
-    });
+    let selectedHandIndex = null;
+    let currentBet = 0;
+    let chips = 5; // 初期チップ数
+    let playerFolded = false;
 
     document.getElementById('startgame').addEventListener('click', () => {
         const name = prompt('名前を入力してください:');
         if (name) {
             console.log(`${name}がゲームに参加しました`);
             socket.emit('joinGame', name);
-            socket.on('waiting', (message) => {
-                console.log('Waiting for another player...');
-                document.getElementById('waitingMessage').textContent = message;
-                lobbyContainer.style.display = 'none';
-                waitingContainer.style.display = 'block';
-            });
         }
+    });
+
+    socket.on('waiting', (message) => {
+        console.log(message);
+        document.getElementById('waitingMessage').textContent = message;
+        lobbyContainer.style.display = 'none';
+        waitingContainer.style.display = 'block';
+    });
+
+    socket.on('gameStart', (gameState) => {
+        console.log('ゲームが開始されました:', gameState);
+        lobbyContainer.style.display = 'none';
+        waitingContainer.style.display = 'none';
+        setupContainer.style.display = 'block';
+        updateChips();
     });
 
     const cardValues = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', '0', '0'];
@@ -69,8 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const card = document.createElement('div');
         card.classList.add('card');
         card.textContent = value;
-        card.dataset.value = value === 'A' ? '1' : value;
-        if (['J', 'Q', 'K'].includes(value)) card.dataset.value = '10';
+        card.dataset.value = (value === 'A' ? '1' : (['J', 'Q', 'K'].includes(value) ? '10' : value));
         card.addEventListener('click', () => {
             card.classList.toggle('selected');
             console.log(`Card ${value} selected`);
@@ -94,6 +95,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
 
                 if (sum <= 21) {
+                    handContainers[hand].innerHTML = '';  // 既存のカードをクリア
                     newCards.forEach(card => {
                         card.classList.remove('selected');
                         handContainers[hand].appendChild(card);
@@ -127,11 +129,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 hands[hand] = Array.from(handContainers[hand].children).map(card => card.textContent);
             });
             socket.emit('readyToStart', hands); // ゲーム開始準備完了をサーバーに通知
-            socket.on('waiting', (message) => {
-                document.getElementById('waitingMessage').textContent = message;
-                setupContainer.style.display = 'none';
-                waitingContainer.style.display = 'block';
-            });
         } else {
             alert('すべてのハンドに3枚のカードを割り当ててください');
         }
@@ -145,31 +142,28 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    socket.on('gameStart', (gameState) => {
-        console.log('ゲームが開始されました:', gameState);
-        lobbyContainer.style.display = 'none';
-        waitingContainer.style.display = 'none';
-        setupContainer.style.display = 'block';
-    });
-
     socket.on('bothReady', (gameState) => {
         console.log('両プレイヤーが準備完了:', gameState);
         const hands = gameState.hands[socket.id];
+        console.log('hands:', hands);  // hands オブジェクトの内容を確認
         if (hands) {
-            Object.keys(hands).forEach((hand, index) => {
-                const container = handContainers[`hand${index + 1}Container`];
+            Object.keys(hands).forEach((hand) => {
+                const container = handContainers[hand];
+                container.innerHTML = '';  // 既存のカードをクリア
+                console.log(`container for ${hand}:`, container);  // container の内容を確認
                 hands[hand].forEach(cardValue => {
                     const card = document.createElement('div');
                     card.classList.add('card');
                     card.textContent = cardValue;
+                    card.dataset.value = (cardValue === 'A' ? '1' : (['J', 'Q', 'K'].includes(cardValue) ? '10' : cardValue));
                     container.appendChild(card);
                 });
-                updateHandSum(`hand${index + 1}`);
+                updateHandSum(hand);
             });
         }
         waitingContainer.style.display = 'none';
         setupContainer.style.display = 'none';
-        gameContainer.style.display = 'block';
+        gameContainer.style.display = 'block'; // ゲーム画面に移動
         displayYourHands();
     });
 
@@ -191,12 +185,8 @@ document.addEventListener('DOMContentLoaded', () => {
         gameContainer.style.display = 'none';
     });
 
-    // 勝負開始後のゲーム画面ロジック
     const yourHandsContainer = document.getElementById('yourHandsContainer');
-    //const chipsDisplay = document.getElementById('chips');
-
     let currentHandIndex = 0;
-    let chips = 5;
     let opponentFolded = false;
 
     function displayYourHands() {
@@ -207,7 +197,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const handButton = document.createElement('button');
             handButton.textContent = `${hand}`;
-            //handButton.id = hand;
             handButton.type = 'button';
             handWrapper.appendChild(handButton);
 
@@ -225,86 +214,174 @@ document.addEventListener('DOMContentLoaded', () => {
 
             yourHandsContainer.appendChild(handWrapper);
 
-            // ハンドボタンにクリックイベントを追加
+            // battleHandsを初期化
+            let battleHands = [];
             handButton.addEventListener('click', () => {
-                const selectedHandIndex = hand;  // ハンドの識別子として使用する
+                selectedHandIndex = hand;
                 const selectedHandCards = Array.from(handContainers[hand].querySelectorAll('.card'))
                     .map(card => card.textContent);
                 console.log(`${hand} のカード情報:`, selectedHandCards);
                 if (confirm(`${hand} で勝負しますか？`)) {
-                    //socket.emit('handSelected', selectedHandIndex, selectedHandCards);
-                    socket.emit('goBetTime');
-                    console.log('socket.emit(goBetTime);');
                     console.log('ハンド確定:', selectedHandIndex, selectedHandCards);
-                    socket.on('wait', (message) => {     // 待機画面を表示する
-                        console.log('wait for another player...');
-                        document.getElementById('waitingMessage').textContent = message;
-                        waitingContainer.style.display = 'block';
-                        gameContainer.style.display = 'none';
-                        setupContainer.style.display = 'none';
-                    });
+                    // battleHandsに選択したハンドの情報を追加
+                    battleHands.push({ handIndex: selectedHandIndex, cards: selectedHandCards });
+                    console.log('battleHands:', battleHands); // 確認のためbattleHandsをログに出力
+                    // サーバーに確定したハンドを通知
+                    socket.emit('confirmHand', { handIndex: selectedHandIndex, cards: selectedHandCards }); // 確定したハンドをサーバーに通知
+                    displayBetSection();
                 }
             });
         });
     }
 
-    socket.on('bettime', () => {
-        console.log('ベットタイム画面になりました');
-        waitingContainer.style.display = 'none';
-        bettimeContainer.style.display = 'block';
-    });
+    function displayBetSection() {
+        const betSection = document.getElementById('betSection');
+        betSection.style.display = 'block';
 
-    socket.on('bothReady', (gameState) => {
-        console.log('両プレイヤーが準備完了:', gameState);
-        waitingContainer.style.display = 'none';
-        gameContainer.style.display = 'block';
-        displayYourHands();
-    });
-
-    /*socket.on('showdown', (opponentHand) => {
-        console.log('対戦結果:', opponentHand);
-        // 選択されたハンドを新しい画面に表示
-        const yourHandContainer = document.getElementById('yourSelectedHandContainer');
-        yourHandContainer.innerHTML = '';
-        selectedHand.forEach(cardValue => {
-            const card = document.createElement('div');
-            card.classList.add('card');
-            card.textContent = cardValue;
-            yourHandContainer.appendChild(card);
+        betButton.addEventListener('click', () => {
+            const betAmount = parseInt(betAmountInput.value);
+            if (selectedHandIndex !== null) {
+                if (betAmount && betAmount <= chips) {
+                    currentBet += betAmount;
+                    chips -= betAmount;
+                    updateChips();
+                    socket.emit('bet', { handIndex: selectedHandIndex, amount: currentBet, action: 'bet' });
+                    console.log(`現在のベット額: ${currentBet}, 残りチップ数: ${chips}`);
+                    betSection.style.display = 'none';
+                    waitingContainer.style.display = 'block'; // 待機画面に移動
+                } else {
+                    alert('無効なベット額です。');
+                }
+            } else {
+                alert('ハンドを選択してください');
+            }
         });
-        // 相手のハンドを新しい画面に表示
-        const opponentHandContainer = document.getElementById('opponentHandContainer');
+
+        callButton.addEventListener('click', () => {
+            socket.emit('call', { handIndex: selectedHandIndex, amount: currentBet });
+            console.log(`コール: ${currentBet}`);
+            gametimeContainer.style.display = 'none';
+            waitingContainer.style.display = 'block';
+        });
+
+        raiseButton.addEventListener('click', () => {
+            const raiseAmount = parseInt(prompt('レイズする額を入力してください'));
+            if (raiseAmount && raiseAmount <= chips) {
+                currentBet += raiseAmount;
+                chips -= raiseAmount;
+                updateChips();
+                socket.emit('raise', { handIndex: selectedHandIndex, amount: currentBet });
+                console.log(`レイズ: ${currentBet}`);
+                gametimeContainer.style.display = 'none';
+                waitingContainer.style.display = 'block';
+            } else {
+                alert('無効なレイズ額です。');
+            }
+        });
+
+        foldButton.addEventListener('click', () => {
+            playerFolded = true;
+            socket.emit('fold', { handIndex: selectedHandIndex });
+            console.log('フォールド');
+            gametimeContainer.style.display = 'none';
+            waitingContainer.style.display = 'block';
+        });
+    }
+
+    socket.on('bothHandsConfirmed', (gameState) => {
+        console.log('両プレイヤーがハンドを確定:', gameState);
+        waitingContainer.style.display = 'none';
+        displaySelectedHand();
+        updateChips();
+    });
+
+    socket.on('opponentBet', (betData) => {
+        console.log(`相手がベットしました。ハンド: ${betData.handIndex}, ベット額: ${betData.amount}`);
+        const message = document.createElement('div');
+        message.textContent = `相手が${betData.amount}枚をベットしました。`;
+        gameMessages.appendChild(message); // ゲーム情報を表示
+        gameMessages.scrollTop = gameMessages.scrollHeight;
+    });
+
+    socket.on('opponentFold', (handIndex) => {
+        opponentFolded = true;
+        console.log(`相手がフォールドしました。ハンド: ${handIndex}`);
+        const message = document.createElement('div');
+        message.textContent = `相手がフォールドしました。ハンド: ${handIndex}`;
+        gameMessages.appendChild(message); // ゲーム情報を表示
+        gameMessages.scrollTop = gameMessages.scrollHeight;
+
+        gameContainer.style.display = 'none';
+        foldContainer.style.display = 'block';
+    });
+
+    socket.on('bothBetsConfirmed', (gameState) => {
+        console.log('両プレイヤーがベットを確定:', gameState);
+        waitingContainer.style.display = 'none';
+        gameContainer.style.display = 'none'; // 現在のゲーム画面を非表示
+        gametimeContainer.style.display = 'block'; // ゲーム確認画面に移動
+        displaySelectedHand();
+        updateChips();
+    });
+
+    socket.on('roundResult', (result) => {
+        waitingContainer.style.display = 'none';
+        showdownContainer.style.display = 'block';
+
+        const message = result.winner ? `勝者: ${result.winner}, 獲得チップ: ${result.chipsWon}` : result.message;
+        alert(message);
+
+        if (result.winner === socket.id) {
+            chips += result.chipsWon;
+        } else if (result.winner) {
+            chips -= result.chipsWon;
+        }
+        updateChips();
+
+        displayShowdown(result);
+        checkRoundCompletion();
+    });
+
+    function displaySelectedHand() {
+        const selectedHand = Array.from(handContainers[selectedHandIndex].querySelectorAll('.card'))
+            .map(card => card.textContent);
+        const selectedHandDiv = document.getElementById('yourSelectedHand');
+        selectedHandDiv.innerHTML = '';
+        let sum = 0;
+        selectedHand.forEach(card => {
+            const cardDiv = document.createElement('div');
+            cardDiv.classList.add('card');
+            cardDiv.textContent = card;
+            cardDiv.dataset.value = (card === 'A' ? '1' : (['J', 'Q', 'K'].includes(card) ? '10' : card));
+            selectedHandDiv.appendChild(cardDiv);
+            sum += parseInt(cardDiv.dataset.value);
+        });
+        yourSelectedHandSumContainer.textContent = `合計: ${sum}`;
+    }
+
+    function displayShowdown(result) {
+        yourSelectedHandContainer.innerHTML = '';
         opponentHandContainer.innerHTML = '';
-        opponentHand.forEach(cardValue => {
-            const card = document.createElement('div');
-            card.classList.add('card');
-            card.textContent = cardValue;
-            opponentHandContainer.appendChild(card);
+
+        const yourHand = result.player1Hand;
+        const opponentHand = result.player2Hand;
+
+        yourHand.forEach(card => {
+            const cardDiv = document.createElement('div');
+            cardDiv.classList.add('card');
+            cardDiv.textContent = card;
+            cardDiv.dataset.value = (card === 'A' ? '1' : (['J', 'Q', 'K'].includes(card) ? '10' : card));
+            yourSelectedHandContainer.appendChild(cardDiv);
         });
 
-        // 新しい画面を表示
-        document.getElementById('showdown').style.display = 'block';
-        document.getElementById('game').style.display = 'none';
-    });*/
-
-    // ベットタイム画面のボタンにイベントリスナーを追加する
-    document.getElementById('callButton').addEventListener('click', () => {
-        socket.emit('bet', { action: 'call' });
-    });
-
-    document.getElementById('raiseButton').addEventListener('click', () => {
-        socket.emit('bet', { action: 'raise' });
-    });
-
-    document.getElementById('foldButton').addEventListener('click', () => {
-        socket.emit('bet', { action: 'fold' });
-    });
-
-    // ベットタイム終了後、ショーダウン画面に遷移する処理を追加する
-    socket.on('endBetTime', () => {
-        bettimeContainer.style.display = 'none';
-        gameContainer.style.display = 'block'; // ショーダウン画面の表示など
-    });
+        opponentHand.forEach(card => {
+            const cardDiv = document.createElement('div');
+            cardDiv.classList.add('card');
+            cardDiv.textContent = card;
+            cardDiv.dataset.value = (card === 'A' ? '1' : (['J', 'Q', 'K'].includes(card) ? '10' : card));
+            opponentHandContainer.appendChild(cardDiv);
+        });
+    }
 
     function checkRoundCompletion() {
         if (currentHandIndex < 4) {
@@ -316,20 +393,33 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    socket.on('opponentBet', (handIndex) => {
-        console.log(`相手がベットしました。ハンド: ${handIndex}`);
-    });
+    function calculateWinner(gameState) {
+        const yourHandSum = calculateHandSum(gameState.hands[socket.id][selectedHandIndex]);
+        const opponentHandSum = calculateHandSum(gameState.hands[gameState.opponentId][selectedHandIndex]);
 
-    socket.on('opponentFold', (handIndex) => {
-        opponentFolded = true;
-        console.log(`相手がフォールドしました。ハンド: ${handIndex}`);
-    });
+        let winner = null;
+        let chipsWon = 0;
 
-    socket.on('roundResult', (result) => {
-        if (result.winner === socket.id) {
-            chips += result.chipsWon;
+        if (yourHandSum > opponentHandSum) {
+            winner = socket.id;
+            chipsWon = gameState.currentBet[1].amount; // 相手のベット額を獲得
+        } else if (yourHandSum < opponentHandSum) {
+            winner = gameState.opponentId;
+            chipsWon = gameState.currentBet[0].amount; // 自分のベット額を相手が獲得
         }
-        alert(`ラウンドの結果: ${result.message}`);
-        chipsDisplay.textContent = chips;
-    });
+
+        socket.emit('roundResult', { winner, chipsWon, player1Hand: gameState.hands[socket.id][selectedHandIndex], player2Hand: gameState.hands[gameState.opponentId][selectedHandIndex] });
+    }
+
+    function calculateHandSum(hand) {
+        return hand.reduce((sum, card) => {
+            if (card === 'A') return sum + 11; // Aは11としてカウント
+            if (['J', 'Q', 'K'].includes(card)) return sum + 10;
+            return sum + parseInt(card);
+        }, 0);
+    }
+
+    function updateChips() {
+        chipsContainer.textContent = chips;
+    }
 });

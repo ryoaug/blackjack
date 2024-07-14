@@ -1,13 +1,11 @@
 <!DOCTYPE html>
 <html lang="ja">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>フルカウント・ブラックジャック</title>
     <link rel="stylesheet" href="styles.css">
 </head>
-
 <body>
     <div id="lobby">
         <h1>フルカウント<br>ブラックジャック</h1>
@@ -69,26 +67,51 @@
 
     <div id="game" style="display:none;">
         <h3>対戦開始！</h3>
-        <div id="opponentHand">相手のハンドがここに表示されます</div>
+        <div id="opponentHand">使用するハンドを決めてください</div>
         <div id="yourHand">
             <h4>あなたのハンド</h4>
             <div id="yourHandsContainer"></div>
             <p>チップ: <span id="chips">5</span></p>
+        </div>
+        <div id="betSection" style="display:none;">
+            <h4>ベット</h4>
+            <input type="number" id="betAmountInput" placeholder="ベット額を入力">
+            <button id="betButton">ベット</button>
+        </div>
+    </div>
+
+    <div id="gametime" style="display: none;">
+        <div id="leftSide">
+            <div id="gameInfo">
+                <h3>ゲーム情報</h3>
+                <div id="gameMessages"></div> <!-- ゲーム情報を表示するための要素 -->
+            </div>
+        </div>
+    
+        <div id="center">
+            <h2>コールorレイズorフォールドtime</h2>
+            <div id="yourSelectedHand"></div>
+            <p id="yourSelectedHandSum">合計: 0</p> <!-- 合計を表示するための要素 -->
+            <button id="foldButton">フォールド</button>
+            <button id="callButton">コール</button> <!-- コールボタン -->
+            <button id="raiseButton">レイズ</button> <!-- レイズボタン -->
+        </div>
+    
+        <div id="rightSide">
             <div id="chat">
+                <h3>チャット</h3>
                 <div id="chatMessages"></div>
                 <input id="chatInput" type="text" placeholder="メッセージを入力">
                 <button id="chatSend">送信</button>
             </div>
         </div>
     </div>
-
-    <div id="bettime" style="display: none;">
-        <h2>ベットタイム</h2>
-        <button id="callButton">コール</button>
-        <button id="raiseButton">レイズ</button>
-        <button id="foldButton">フォールド</button>
-        <button id="confirmBet">確定</button> 
-        <!-- 現在のベットや他の関連情報をここに表示 -->
+    
+    
+    <div id="fold" style="display: none;">
+        <h2>フォールドしました</h2>
+        <p id="foldMessage"></p>
+        <button id="nextRoundButton">次のラウンドへ</button>
     </div>
 
     <div id="showdown" style="display: none;">
@@ -108,9 +131,7 @@
         </div>
     </div>
 
-    <script src="/socket.io/socket.io.js">
-    </script>
+    <script src="/socket.io/socket.io.js"></script>
     <script src="client.js"></script>
 </body>
-
 </html>
