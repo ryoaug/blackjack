@@ -20,7 +20,7 @@ io.on('connection', (socket) => {
         console.log(`Player ${name} joined the game`);
 
         if (waitingPlayer === null) {
-            waitingPlayer = { id: socket.id, name: name, chips: 5, battleHands: null };
+            waitingPlayer = { id: socket.id, name: name, chips: 5 };
             socket.emit('waiting', '他のプレーヤーの参加を待っています');
         } else {
             const gameId = `game-${waitingPlayer.id}-${socket.id}`;
@@ -64,38 +64,19 @@ io.on('connection', (socket) => {
 
     socket.on('confirmHand', (data) => {
         const gameId = getGameIdByPlayerId(socket.id);
-        // dataから送られてきた手の情報をbattleHandsに追加
-        battleHands.push({
-            playerId: socket.id,
-            handIndex: data.handIndex,
-            cards: data.cards
-        });
-        // battleHandsに2つの手が揃った場合、勝敗を決定する
-        if (battleHands.length === 2) {
-            // ここで勝敗判定を行う処理を記述する（例: 簡単な手役判定など）
+        if (gameId) {
+            const game = games[gameId];
+            if (!handsConfirmedPlayers[gameId]) handsConfirmedPlayers[gameId] = [];
+            handsConfirmedPlayers[gameId].push(socket.id);
+            console.log(`Player ${socket.id} confirmed hand:`, data);
 
-            // 勝者が決まったら、勝者のIDをクライアントに送信する
-            let winner = determineWinner(battleHands[0], battleHands[1]);
-            io.to(battleHands[0].playerId).emit('gameResult', { winner: winner });
-            io.to(battleHands[1].playerId).emit('gameResult', { winner: winner });
-
-            // battleHandsを空にする（次の勝負のため）
-            battleHands = [];
+            if (handsConfirmedPlayers[gameId].length === 2) {
+                io.to(game.player1.id).emit('bothHandsConfirmed', game);
+                io.to(game.player2.id).emit('bothHandsConfirmed', game);
+                handsConfirmedPlayers[gameId] = [];
+            }
         }
     });
-
-    /*if (gameId) {
-        const game = games[gameId];
-        if (!handsConfirmedPlayers[gameId]) handsConfirmedPlayers[gameId] = [];
-        handsConfirmedPlayers[gameId].push(socket.id);
-        console.log(`Player ${socket.id} confirmed hand:`, data);
-
-        if (handsConfirmedPlayers[gameId].length === 2) {
-            io.to(game.player1.id).emit('bothHandsConfirmed', game);
-            io.to(game.player2.id).emit('bothHandsConfirmed', game);
-            handsConfirmedPlayers[gameId] = [];
-        }
-    }*/
 
     socket.on('bet', (data) => {
         const gameId = getGameIdByPlayerId(socket.id);
@@ -118,13 +99,22 @@ io.on('connection', (socket) => {
         }
     });
 
+    // フォールドメッセージを受け取る
+    socket.on('fold', (data) => {
+        console.log('プレイヤーがこの勝負を降りました', data);
+        // 自分以外の全てのクライアントにフォールドしたことを通知する
+        socket.broadcast.emit('opponentFolded', { handIndex: data.handIndex });
+        // 自分自身にもフォールドしたことを通知する
+        socket.emit('playerFolded', { handIndex: data.handIndex });
+    });
+
     socket.on('roundResult', (result) => {
         const gameId = getGameIdByPlayerId(socket.id);
         if (gameId) {
             const game = games[gameId];
             const player1Id = game.player1.id;
             const player2Id = game.player2.id;
-
+            
             io.to(player1Id).emit('roundResult', result);
             io.to(player2Id).emit('roundResult', result);
         }
@@ -164,35 +154,6 @@ function getGameIdByPlayerId(playerId) {
     }
     return null;
 }
-
-// ハンドの合計値を計算する関数の例（手札が数字の配列として与えられた場合）
-function calculateHandValue(cards) {
-    // cardsはカードの配列で、各カードの値を数値化して合計する
-    let totalValue = cards.reduce((sum, card) => {
-        // カードの値を数値に変換し、合計に加える
-        let value = parseInt(card, 10); // 例: 文字列から数値に変換する
-        return sum + value;
-    }, 0);
-    return totalValue;
-}
-
-// 勝者を決定する関数
-function determineWinner(hand1, hand2) {
-    // 手札の合計値を計算する
-    let hand1Value = calculateHandValue(hand1.cards);
-    let hand2Value = calculateHandValue(hand2.cards);
-
-    // 合計値を比較して勝者を決定する
-    if (hand1Value > hand2Value) {
-        return hand1.playerId;
-    } else if (hand2Value > hand1Value) {
-        return hand2.playerId;
-    } else {
-        // 同点の場合、引き分けとする（ここでは特に何もしない）
-        return null;
-    }
-}
-
 
 server.listen(3000, () => {
     console.log('Server is running on port 3000');
