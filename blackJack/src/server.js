@@ -10,29 +10,24 @@ let waitingPlayer = null;
 let games = {};
 let readyPlayers = {};
 let handsConfirmedPlayers = {};
-let betsConfirmedPlayers = {};
-let playerHands = {}; // プレイヤーのハンドの合計値を格納するオブジェクト
-let players = []; // プレイヤーの配列
+let playerHands = {};
+let players = [];
 
 app.use(express.static('public'));
 
 io.on('connection', (socket) => {
     socket.on('joinGame', (name) => {
-        socket.username = name;  // ユーザー名を保存
-        console.log(`Player ${name} joined the game`);
-
+        socket.username = name;
         if (waitingPlayer === null) {
-            waitingPlayer = { id: socket.id, name: name, chips: 5 };
+            waitingPlayer = { id: socket.id, name: name, points: 0 };
             socket.emit('waiting', '他のプレーヤーの参加を待っています');
         } else {
             const gameId = `game-${waitingPlayer.id}-${socket.id}`;
             games[gameId] = {
                 player1: waitingPlayer,
-                player2: { id: socket.id, name: name, chips: 5 },
+                player2: { id: socket.id, name: name, points: 0 },
                 hands: {},
-                currentBet: [null, null],
-                waitingForBet: [],
-                betsConfirmed: [false, false],
+                rounds: 0
             };
 
             io.to(waitingPlayer.id).emit('gameStart', games[gameId]);
@@ -47,7 +42,6 @@ io.on('connection', (socket) => {
         if (gameId) {
             readyPlayers[socket.id] = true;
             games[gameId].hands[socket.id] = hands;
-            console.log(`Player ${socket.id} is ready with hands:`, hands);
 
             const game = games[gameId];
             const player1Ready = readyPlayers[game.player1.id];
@@ -70,7 +64,6 @@ io.on('connection', (socket) => {
             const game = games[gameId];
             if (!handsConfirmedPlayers[gameId]) handsConfirmedPlayers[gameId] = [];
             handsConfirmedPlayers[gameId].push(socket.id);
-            console.log(`Player ${socket.id} confirmed hand:`, data);
 
             if (handsConfirmedPlayers[gameId].length === 2) {
                 io.to(game.player1.id).emit('bothHandsConfirmed', game);
@@ -80,83 +73,74 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('bet', (data) => {
-        const gameId = getGameIdByPlayerId(socket.id);
-        if (gameId) {
-            const game = games[gameId];
-            const playerIndex = game.player1.id === socket.id ? 0 : 1;
-            console.log(`Player ${socket.id} bet:`, data);
+    socket.on('battle', (data) => {
+        const handSum = data.handSum;
+        playerHands[socket.id] = handSum;
 
-            game.currentBet[playerIndex] = { amount: data.amount, action: 'bet' };
-            const opponentId = game.player1.id === socket.id ? game.player2.id : game.player1.id;
-            io.to(opponentId).emit('opponentBet', { handIndex: data.handIndex, amount: data.amount });
+        players.push(socket.id);
+        if (players.length === 2) {
+            const [player1Id, player2Id] = players;
+            const player1HandSum = playerHands[player1Id];
+            const player2HandSum = playerHands[player2Id];
+            let winner = '';
 
-            game.betsConfirmed[playerIndex] = true;
+            if (player1HandSum > player2HandSum) {
+                winner = 'プレーヤー1';
+                games[getGameIdByPlayerId(player1Id)].player1.points += 3;
+            } else if (player1HandSum < player2HandSum) {
+                winner = 'プレーヤー2';
+                games[getGameIdByPlayerId(player2Id)].player2.points += 3;
+            } else {
+                winner = '引き分け';
+            }
 
-            if (game.betsConfirmed[0] && game.betsConfirmed[1]) {
-                io.to(game.player1.id).emit('bothBetsConfirmed', game);
-                io.to(game.player2.id).emit('bothBetsConfirmed', game);
-                game.betsConfirmed = [false, false];  // リセット
+            const result = {
+                message: `勝者は${winner}です。`,
+                player1HandSum,
+                player2HandSum
+            };
+            io.emit('battleResult', result);
+
+            playerHands = {};
+            players = [];
+
+            const game = games[getGameIdByPlayerId(player1Id)];
+            game.rounds += 1;
+            if (game.rounds >= 5) {
+                const finalWinner = game.player1.points > game.player2.points ? game.player1.name : game.player2.name;
+                io.to(game.player1.id).emit('gameOver', { winner: finalWinner, player1Points: game.player1.points, player2Points: game.player2.points });
+                io.to(game.player2.id).emit('gameOver', { winner: finalWinner, player1Points: game.player1.points, player2Points: game.player2.points });
             }
         }
     });
 
     socket.on('fold', (data) => {
-        console.log('プレイヤーがこの勝負を降りました', data);
         const gameId = getGameIdByPlayerId(socket.id);
         if (gameId) {
             const game = games[gameId];
             const opponentId = game.player1.id === socket.id ? game.player2.id : game.player1.id;
+            const foldPlayer = game.player1.id === socket.id ? game.player1 : game.player2;
+            const nonFoldPlayer = game.player1.id === socket.id ? game.player2 : game.player1;
+
+            nonFoldPlayer.points += 1;
+
             io.to(opponentId).emit('opponentFolded', { handIndex: data.handIndex });
             socket.emit('playerFolded', { handIndex: data.handIndex });
-        }
-    });
 
-    socket.on('battle', (data) => {
-        const handSum = data.handSum;
-        playerHands[socket.id] = handSum; // プレイヤーのハンドの合計値を保存
-
-        console.log(`プレイヤー ${socket.id} の合計値を受け取りました:`, handSum);
-        players.push(socket.id);
-        console.log('現在のプレイヤー配列:', players); // プレイヤー配列の状態をログに出力
-        if (players.length === 2) {
-            const [player1Id, player2Id] = players;
-            const player1HandSum = playerHands[player1Id];
-            const player2HandSum = playerHands[player2Id]
-            let winner = ''; // 勝者を格納する変数
-            // 勝者の判定
-            if (player1HandSum > player2HandSum) {
-                winner = 'プレーヤー1';
-            } else if (player1HandSum < player2HandSum) {
-                winner = 'プレーヤー2';
-            } else {
-                winner = '引き分け';
-            }
-            // 勝負の結果を作成
             const result = {
-                message: `勝者は${winner}です。`, // 勝者のメッセージを作成
-                player1HandSum,
-                player2HandSum
+                message: `相手がフォールドしました。`,
+                player1Points: game.player1.points,
+                player2Points: game.player2.points
             };
-            console.log('送信する結果:', result);
-            io.emit('battleResult', result);
+            io.to(game.player1.id).emit('updatePoints', result);
+            io.to(game.player2.id).emit('updatePoints', result);
 
-            // ハンドの合計値とプレイヤー配列をリセット
-            playerHands = {};
-            players = [];
-        }
-
-    });
-
-    socket.on('roundResult', (result) => {
-        const gameId = getGameIdByPlayerId(socket.id);
-        if (gameId) {
-            const game = games[gameId];
-            const player1Id = game.player1.id;
-            const player2Id = game.player2.id;
-
-            io.to(player1Id).emit('roundResult', result);
-            io.to(player2Id).emit('roundResult', result);
+            game.rounds += 1;
+            if (game.rounds >= 5) {
+                const finalWinner = game.player1.points > game.player2.points ? game.player1.name : game.player2.name;
+                io.to(game.player1.id).emit('gameOver', { winner: finalWinner, player1Points: game.player1.points, player2Points: game.player2.points });
+                io.to(game.player2.id).emit('gameOver', { winner: finalWinner, player1Points: game.player1.points, player2Points: game.player2.points });
+            }
         }
     });
 
@@ -164,7 +148,7 @@ io.on('connection', (socket) => {
         const gameId = getGameIdByPlayerId(socket.id);
         if (gameId) {
             const game = games[gameId];
-            const sender = socket.username; // ユーザー名を取得
+            const sender = socket.username;
             io.to(game.player1.id).emit('receiveMessage', { sender, message });
             io.to(game.player2.id).emit('receiveMessage', { sender, message });
         }
