@@ -214,7 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
             handWrapper.appendChild(handContainer);
 
             const handSum = document.createElement('p');
-            handSum.textContent = `合計: ${handSums[hand].textContent}`;
+            handSum.textContent = ` ${handSums[hand].textContent}`;
             handWrapper.appendChild(handSum);
 
             yourHandsContainer.appendChild(handWrapper);

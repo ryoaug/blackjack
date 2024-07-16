@@ -213,11 +213,13 @@ body {
     display: flex;
     flex-direction: column;
     justify-content: center;
+    align-items: center;
     margin: auto;
 }
 
 .button-container {
     display: flex;
+    justify-content: center; /* ボタンを中央に揃える */
     gap: 20px;
     /* ボタン間のスペース */
     margin-top: 10px;
