@@ -1,5 +1,6 @@
 const express = require('express');
 const http = require('http');
+const { connect } = require('http2');
 const socketIo = require('socket.io');
 
 const app = express();
@@ -84,30 +85,37 @@ io.on('connection', (socket) => {
             const player2HandSum = playerHands[player2Id];
             let winner = '';
 
+            const gameId = getGameIdByPlayerId(player1Id);
+            const game = games[gameId];
+
             if (player1HandSum > player2HandSum) {
-                winner = 'プレーヤー1';
-                games[getGameIdByPlayerId(player1Id)].player1.points += 3;
+                winner = game.player1.name;
+                game.player1.points += 3;
             } else if (player1HandSum < player2HandSum) {
-                winner = 'プレーヤー2';
-                games[getGameIdByPlayerId(player2Id)].player2.points += 3;
+                winner = game.player2.name;
+                game.player2.points += 3;
             } else {
-                winner = '引き分け';
+                winner = 'いません。引き分け';
             }
 
             const result = {
                 message: `勝者は${winner}です。`,
                 player1HandSum,
-                player2HandSum
+                player2HandSum,
+                player1Name: game.player1.name,
+                player2Name: game.player2.name,
+                player1Points: game.player1.points,
+                player2Points: game.player2.points
             };
-            // ログ出力
-            console.log(result.message);
-            io.emit('battleResult', result);
+
+            io.to(player1Id).emit('battleResult', result);
+            io.to(player2Id).emit('battleResult', result);
 
             playerHands = {};
             players = [];
 
-            const game = games[getGameIdByPlayerId(player1Id)];
             game.rounds += 1;
+            console.log(`ラウンド ${game.rounds}`);
             if (game.rounds >= 5) {
                 const finalWinner = game.player1.points > game.player2.points ? game.player1.name : game.player2.name;
                 io.to(game.player1.id).emit('gameOver', { winner: finalWinner, player1Points: game.player1.points, player2Points: game.player2.points });
@@ -137,11 +145,9 @@ io.on('connection', (socket) => {
             io.to(game.player2.id).emit('updatePoints', result);
 
             game.rounds += 1;
-            console.log(game.round);
+            console.log(`ラウンド ${game.rounds}`);
             if (game.rounds >= 5) {
-                const finalWinner = game.player1.points > game.player2.points ? game.player1.name :
-                                    game.player1.points < game.player2.points ? game.player2.name :
-                                    '引き分け';
+                const finalWinner = game.player1.points > game.player2.points ? game.player1.name : game.player2.name;
                 io.to(game.player1.id).emit('gameOver', { winner: finalWinner, player1Points: game.player1.points, player2Points: game.player2.points });
                 io.to(game.player2.id).emit('gameOver', { winner: finalWinner, player1Points: game.player1.points, player2Points: game.player2.points });
             }

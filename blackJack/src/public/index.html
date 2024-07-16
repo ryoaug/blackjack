@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>フルカウント・ブラックジャック</title>
     <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
     <div id="lobby">
         <h1>フルカウント<br>ブラックジャック</h1>
@@ -78,8 +80,10 @@
             <h2>勝負time</h2>
             <div id="yourSelectedHand"></div>
             <p id="yourSelectedHandSum">合計: 0</p>
-            <button id="battle">勝負</button>
-            <button id="foldButton">フォールド</button>
+            <div class="button-container">
+                <button id="battle">勝負</button>
+                <button id="foldButton">フォールド</button>
+            </div>
         </div>
         <div id="rightSide">
             <div id="chat">
@@ -101,12 +105,10 @@
             <h4>あなたの選択したハンド</h4>
             <div id="yourSelectedHandContainer"></div>
         </div>
+        <p id="resultMessage"></p>
+        <p id="player1Points"></p>
+        <p id="player2Points"></p>
         <button id="nextRoundButton">次のラウンドへ</button>
-        <div id="chat">
-            <div id="chatMessages"></div>
-            <input id="chatInput" type="text" placeholder="メッセージを入力">
-            <button id="chatSend">送信</button>
-        </div>
     </div>
 
     <div id="fold" style="display: none;">
@@ -115,7 +117,9 @@
         <button id="foldNextRoundButton">次のラウンドへ</button>
     </div>
 
+
     <script src="/socket.io/socket.io.js"></script>
     <script src="client.js"></script>
 </body>
+
 </html>
