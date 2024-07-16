@@ -99,6 +99,8 @@ io.on('connection', (socket) => {
                 player1HandSum,
                 player2HandSum
             };
+            // ログ出力
+            console.log(result.message);
             io.emit('battleResult', result);
 
             playerHands = {};
@@ -119,10 +121,9 @@ io.on('connection', (socket) => {
         if (gameId) {
             const game = games[gameId];
             const opponentId = game.player1.id === socket.id ? game.player2.id : game.player1.id;
-            const foldPlayer = game.player1.id === socket.id ? game.player1 : game.player2;
             const nonFoldPlayer = game.player1.id === socket.id ? game.player2 : game.player1;
 
-            nonFoldPlayer.points += 1;
+            nonFoldPlayer.points += 1; // フォールドしていないプレイヤーのポイントを増やす
 
             io.to(opponentId).emit('opponentFolded', { handIndex: data.handIndex });
             socket.emit('playerFolded', { handIndex: data.handIndex });
@@ -136,8 +137,11 @@ io.on('connection', (socket) => {
             io.to(game.player2.id).emit('updatePoints', result);
 
             game.rounds += 1;
+            console.log(game.round);
             if (game.rounds >= 5) {
-                const finalWinner = game.player1.points > game.player2.points ? game.player1.name : game.player2.name;
+                const finalWinner = game.player1.points > game.player2.points ? game.player1.name :
+                                    game.player1.points < game.player2.points ? game.player2.name :
+                                    '引き分け';
                 io.to(game.player1.id).emit('gameOver', { winner: finalWinner, player1Points: game.player1.points, player2Points: game.player2.points });
                 io.to(game.player2.id).emit('gameOver', { winner: finalWinner, player1Points: game.player1.points, player2Points: game.player2.points });
             }

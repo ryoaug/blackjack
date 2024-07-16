@@ -11,6 +11,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const showdownContainer = document.getElementById('showdown');
     const gametimeContainer = document.getElementById('gametime');
     const foldContainer = document.getElementById('fold');
+    const nextRoundButton = document.getElementById('nextRoundButton');
+    const foldNextRoundButton = document.getElementById('foldNextRoundButton');
     const yourSelectedHandContainer = document.getElementById('yourSelectedHandContainer');
     const opponentHandContainer = document.getElementById('opponentHandContainer');
     const yourSelectedHandSumContainer = document.getElementById('yourSelectedHandSum');
@@ -36,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let selectedHandIndex = null;
     let points = 0; // 初期ポイント
-    let usedHands = [];
+    let usedHands = []; // 使用済みハンドのリスト
 
     function openModal() {
         var modal = document.getElementById('checkrulesModal');
@@ -182,8 +184,6 @@ document.addEventListener('DOMContentLoaded', () => {
         chatMessages.scrollTop = chatMessages.scrollHeight;
     });
 
-    socket.on('updateState', (gameState) => { });
-
     socket.on('opponentDisconnected', () => {
         alert('対戦相手が切断しました。');
         setupContainer.style.display = 'block';
@@ -218,24 +218,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
             yourHandsContainer.appendChild(handWrapper);
 
-            handButton.addEventListener('click', () => {
-                if (!usedHands.includes(hand)) {
-                    selectedHandIndex = hand;
-                    const selectedHandCards = Array.from(handContainers[hand].querySelectorAll('.card'))
-                        .map(card => card.textContent);
-                    if (confirm(`${hand} で勝負しますか？`)) {
-                        socket.emit('confirmHand', { handIndex: selectedHandIndex, cards: selectedHandCards });
+            // 使用済みハンドのチェック
+            if (usedHands.includes(hand)) {
+                handButton.disabled = true; // ボタンを無効化
+                handButton.textContent = `${hand} (使用済み)`; // ボタンのテキストを変更
+            } else {
+                handButton.addEventListener('click', () => {
+                    if (!usedHands.includes(hand)) {
+                        selectedHandIndex = hand;
+                        const selectedHandCards = Array.from(handContainers[hand].querySelectorAll('.card'))
+                            .map(card => card.textContent);
+                        if (confirm(`${hand} で勝負しますか？`)) {
+                            socket.emit('confirmHand', { handIndex: selectedHandIndex, cards: selectedHandCards });
+                            usedHands.push(hand); // 使用済みリストに追加
+                            handButton.disabled = true; // ボタンを無効化
+                            handButton.textContent = `${hand} (使用済み)`; // ボタンのテキストを変更
+                        }
+                    } else {
+                        alert('このハンドは既に使用されています。');
                     }
-                } else {
-                    alert('このハンドは既に使用されています。');
-                }
-            });
+                });
+            }
         });
     }
 
     battleButton.addEventListener('click', () => {
         if (confirm('勝負しますか？')) {
-            const playerHandSum = parseInt(yourSelectedHandSum.textContent.split(': ')[1]);
+            const playerHandSum = parseInt(yourSelectedHandSumContainer.textContent.split(': ')[1]);
             waitingContainer.style.display = 'block';
             socket.emit('battle', { handSum: playerHandSum });
         }
@@ -249,13 +258,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    socket.on('opponentFolded', () => {
+    socket.on('opponentFolded', (data) => {
         alert('相手がフォールドしました。ポイントを1獲得しました。');
+        points += 1; // フォールドしていないプレイヤーのポイントを更新
+        updatePoints();
         gametimeContainer.style.display = 'none';
         foldContainer.style.display = 'block';
     });
 
-    // 次のラウンドへボタンのイベントリスナー
     nextRoundButton.addEventListener('click', () => {
         // 使用済みハンドを非表示にする
         const usedHandContainer = handContainers[selectedHandIndex];
@@ -263,13 +273,24 @@ document.addEventListener('DOMContentLoaded', () => {
         foldContainer.style.display = 'none';
         gameContainer.style.display = 'none';
         gametimeContainer.style.display = 'none';
+        showdownContainer.style.display = 'none';
+        gameContainer.style.display = 'block'; // ハンド選択画面に戻る
+        resetForNextRound(); // 次のラウンドの準備
+    });
+
+    foldNextRoundButton.addEventListener('click', () => {
+        // 使用済みハンドを非表示にする
+        const usedHandContainer = handContainers[selectedHandIndex];
+        usedHandContainer.style.display = 'none';
+        foldContainer.style.display = 'none';
+        gameContainer.style.display = 'none';
+        gametimeContainer.style.display = 'none';
+        showdownContainer.style.display = 'none';
         gameContainer.style.display = 'block'; // ハンド選択画面に戻る
         resetForNextRound(); // 次のラウンドの準備
     });
 
     socket.on('battleResult', (result) => {
-        const gameMessages = document.getElementById('gameMessages');
-        gameMessages.textContent = result.message;
         gametimeContainer.style.display = 'none';
         waitingContainer.style.display = 'none';
         showdownContainer.style.display = 'block';
@@ -305,11 +326,22 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     socket.on('gameOver', (data) => {
-        alert(`ゲーム終了！ 勝者は ${data.winner} です。\nプレイヤー1のポイント: ${data.player1Points}\nプレイヤー2のポイント: ${data.player2Points}`);
+        let winnerMessage = '';
+        if (data.winner === game.player1.name || data.winner === game.player2.name) {
+            winnerMessage = `ゲーム終了！ 勝者は ${data.winner} です。`;
+        } else {
+            winnerMessage = 'ゲーム終了！ 引き分けです。';
+        }
+        alert(`${winnerMessage}\nプレイヤー1のポイント: ${data.player1Points}\nプレイヤー2のポイント: ${data.player2Points}`);
         location.reload();
     });
 
     function updatePoints() {
         pointsContainer.textContent = points;
+    }
+
+    function resetForNextRound() {
+        selectedHandIndex = null;
+        displayYourHands();
     }
 });
