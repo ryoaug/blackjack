@@ -21,7 +21,7 @@ io.on('connection', (socket) => {
         socket.username = name;
         if (waitingPlayer === null) {
             waitingPlayer = { id: socket.id, name: name, points: 0 };
-            socket.emit('waiting', '他のプレーヤーの参加を待っています');
+            socket.emit('waiting', '相手が準備完了するのを待っています');
         } else {
             const gameId = `game-${waitingPlayer.id}-${socket.id}`;
             games[gameId] = {
@@ -77,17 +77,17 @@ io.on('connection', (socket) => {
     socket.on('battle', (data) => {
         const handSum = data.handSum;
         playerHands[socket.id] = handSum;
-
+    
         players.push(socket.id);
         if (players.length === 2) {
             const [player1Id, player2Id] = players;
             const player1HandSum = playerHands[player1Id];
             const player2HandSum = playerHands[player2Id];
             let winner = '';
-
+    
             const gameId = getGameIdByPlayerId(player1Id);
             const game = games[gameId];
-
+    
             if (player1HandSum > player2HandSum) {
                 winner = game.player1.name;
                 game.player1.points += 3;
@@ -97,7 +97,7 @@ io.on('connection', (socket) => {
             } else {
                 winner = 'いません。引き分け';
             }
-
+    
             const result = {
                 message: `勝者は${winner}です。`,
                 player1HandSum,
@@ -105,24 +105,39 @@ io.on('connection', (socket) => {
                 player1Name: game.player1.name,
                 player2Name: game.player2.name,
                 player1Points: game.player1.points,
-                player2Points: game.player2.points
+                player2Points: game.player2.points,
+                player1Id: game.player1.id,
+                player2Id: game.player2.id
             };
-
+    
             io.to(player1Id).emit('battleResult', result);
             io.to(player2Id).emit('battleResult', result);
-
+    
             playerHands = {};
             players = [];
-
+    
             game.rounds += 1;
             console.log(`ラウンド ${game.rounds}`);
             if (game.rounds >= 5) {
                 const finalWinner = game.player1.points > game.player2.points ? game.player1.name : game.player2.name;
-                io.to(game.player1.id).emit('gameOver', { winner: finalWinner, player1Points: game.player1.points, player2Points: game.player2.points });
-                io.to(game.player2.id).emit('gameOver', { winner: finalWinner, player1Points: game.player1.points, player2Points: game.player2.points });
+                io.to(game.player1.id).emit('gameOver', { 
+                    winner: finalWinner, 
+                    player1Points: game.player1.points, 
+                    player2Points: game.player2.points,
+                    player1Name: game.player1.name, // 追加
+                    player2Name: game.player2.name  // 追加
+                });
+                io.to(game.player2.id).emit('gameOver', { 
+                    winner: finalWinner, 
+                    player1Points: game.player1.points, 
+                    player2Points: game.player2.points,
+                    player1Name: game.player1.name, // 追加
+                    player2Name: game.player2.name  // 追加
+                });
             }
         }
     });
+    
 
     socket.on('fold', (data) => {
         const gameId = getGameIdByPlayerId(socket.id);
@@ -135,12 +150,16 @@ io.on('connection', (socket) => {
 
             io.to(opponentId).emit('opponentFolded', { handIndex: data.handIndex });
             socket.emit('playerFolded', { handIndex: data.handIndex });
-
+            
             const result = {
                 message: `相手がフォールドしました。`,
+                player1Id: game.player1.id,
+                player2Id: game.player2.id,
                 player1Points: game.player1.points,
                 player2Points: game.player2.points
             };
+            io.to(game.player1.id).emit('updatePoints', result);
+            io.to(game.player2.id).emit('updatePoints', result);
             io.to(game.player1.id).emit('updatePoints', result);
             io.to(game.player2.id).emit('updatePoints', result);
 
